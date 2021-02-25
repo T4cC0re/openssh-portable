@@ -65,7 +65,7 @@ ipv64_normalise_mapped(struct sockaddr_storage *addr, socklen_t *len)
  * The returned string must be freed.
  */
 static char *
-get_socket_address(int sock, int remote, int flags)
+get_socket_address(int sock, int remote, int flags, struct sockaddr_storage *existing)
 {
 	struct sockaddr_storage addr;
 	socklen_t addrlen;
@@ -77,8 +77,12 @@ get_socket_address(int sock, int remote, int flags)
 	memset(&addr, 0, sizeof(addr));
 
 	if (remote) {
-		if (getpeername(sock, (struct sockaddr *)&addr, &addrlen) != 0)
-			return NULL;
+		if (existing != NULL) {
+			memcpy(&addr, existing, sizeof(addr));
+		} else {
+			if (getpeername(sock, (struct sockaddr *)&addr, &addrlen) != 0)
+				return NULL;
+		}
 	} else {
 		if (getsockname(sock, (struct sockaddr *)&addr, &addrlen) != 0)
 			return NULL;
@@ -111,11 +115,18 @@ get_socket_address(int sock, int remote, int flags)
 }
 
 char *
-get_peer_ipaddr(int sock)
+get_peer_ipaddr(int sock, struct sockaddr_storage *existing, int force_no_env)
 {
 	char *p;
 
-	if ((p = get_socket_address(sock, 1, NI_NUMERICHOST)) != NULL)
+	if (force_no_env == 0) {
+		char *proxy_ipaddr = getenv("OPENSSH_PROXY_HOST");
+		if (proxy_ipaddr) {
+			return xstrdup(proxy_ipaddr);
+		}
+	}
+
+	if ((p = get_socket_address(sock, 1, NI_NUMERICHOST, existing)) != NULL)
 		return p;
 	return xstrdup("UNKNOWN");
 }
@@ -125,7 +136,7 @@ get_local_ipaddr(int sock)
 {
 	char *p;
 
-	if ((p = get_socket_address(sock, 0, NI_NUMERICHOST)) != NULL)
+	if ((p = get_socket_address(sock, 0, NI_NUMERICHOST, NULL)) != NULL)
 		return p;
 	return xstrdup("UNKNOWN");
 }
@@ -136,7 +147,7 @@ get_local_name(int fd)
 	char *host, myname[NI_MAXHOST];
 
 	/* Assume we were passed a socket */
-	if ((host = get_socket_address(fd, 0, NI_NAMEREQD)) != NULL)
+	if ((host = get_socket_address(fd, 0, NI_NAMEREQD, NULL)) != NULL)
 		return host;
 
 	/* Handle the case where we were passed a pipe */
@@ -153,7 +164,7 @@ get_local_name(int fd)
 /* Returns the local/remote port for the socket. */
 
 static int
-get_sock_port(int sock, int local)
+get_sock_port(int sock, int local, struct sockaddr_storage *existing)
 {
 	struct sockaddr_storage from;
 	socklen_t fromlen;
@@ -169,9 +180,13 @@ get_sock_port(int sock, int local)
 			return 0;
 		}
 	} else {
-		if (getpeername(sock, (struct sockaddr *)&from, &fromlen) == -1) {
-			debug("getpeername failed: %.100s", strerror(errno));
-			return -1;
+		if (existing != NULL) {
+			memcpy(&from, existing, sizeof(from));
+		} else {
+			if (getpeername(sock, (struct sockaddr *)&from, &fromlen) == -1) {
+				debug("getpeername failed: %.100s", strerror(errno));
+				return -1;
+			}
 		}
 	}
 
@@ -192,13 +207,22 @@ get_sock_port(int sock, int local)
 }
 
 int
-get_peer_port(int sock)
+get_peer_port(int sock, struct sockaddr_storage *existing, int force_no_env)
 {
-	return get_sock_port(sock, 0);
+	char *proxy_port = getenv("OPENSSH_PROXY_PORT");
+	int port;
+	if (proxy_port && force_no_env == 0) {
+		if (sscanf(proxy_port, "%d", &port) == 1) {
+			debug("got port from env: %d", port);
+			return port;
+		}
+	}
+
+	return get_sock_port(sock, 0, existing);
 }
 
 int
 get_local_port(int sock)
 {
-	return get_sock_port(sock, 1);
+	return get_sock_port(sock, 1, NULL);
 }

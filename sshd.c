@@ -885,9 +885,9 @@ drop_connection(int sock, int startups, int notify_pipe)
 	ndropped++;
 
 	laddr = get_local_ipaddr(sock);
-	raddr = get_peer_ipaddr(sock);
+	raddr = get_peer_ipaddr(sock, NULL, 0);
 	do_log2(drop_level, "drop connection #%d from [%s]:%d on [%s]:%d "
-	    "past MaxStartups", startups, raddr, get_peer_port(sock),
+		"past MaxStartups", startups, raddr, get_peer_port(sock, NULL, 0),
 	    laddr, get_local_port(sock));
 	free(laddr);
 	free(raddr);
@@ -1271,6 +1271,24 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					startup_flags[j] = 1;
 					break;
 				}
+
+			char *proxy_ipaddr;
+			char *proxy_port;
+
+			if (*newsock != -1) {
+				{
+					proxy_ipaddr = get_peer_ipaddr(*newsock, &from, 1);
+					debug("PROXY_HOST: %s", proxy_ipaddr);
+					setenv("OPENSSH_PROXY_HOST", proxy_ipaddr, 1);
+					debug("OPENSSH_PROXY_HOST: %s", proxy_ipaddr);
+				}
+				{
+					proxy_port = malloc(16);
+					snprintf(proxy_port, 16, "%d", get_peer_port(*newsock, &from, 1));
+					setenv("OPENSSH_PROXY_PORT", proxy_port, 1);
+					debug("OPENSSH_PROXY_PORT: %s", proxy_port);
+				}
+			}
 
 			/*
 			 * Got connection.  Fork a child to handle it, unless

@@ -1662,8 +1662,8 @@ channel_post_x11_listener(struct ssh *ssh, Channel *c,
 		return;
 	}
 	set_nodelay(newsock);
-	remote_ipaddr = get_peer_ipaddr(newsock);
-	remote_port = get_peer_port(newsock);
+	remote_ipaddr = get_peer_ipaddr(newsock, NULL, 0);
+	remote_port = get_peer_port(newsock, NULL, 0);
 	snprintf(buf, sizeof buf, "X11 connection from %.200s port %d",
 	    remote_ipaddr, remote_port);
 
@@ -1685,8 +1685,8 @@ port_open_helper(struct ssh *ssh, Channel *c, char *rtype)
 {
 	char *local_ipaddr = get_local_ipaddr(c->sock);
 	int local_port = c->sock == -1 ? 65536 : get_local_port(c->sock);
-	char *remote_ipaddr = get_peer_ipaddr(c->sock);
-	int remote_port = get_peer_port(c->sock);
+	char *remote_ipaddr = get_peer_ipaddr(c->sock, NULL, 0);
+	int remote_port = get_peer_port(c->sock, NULL, 0);
 	int r;
 
 	if (remote_port == -1) {

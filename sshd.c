@@ -126,6 +126,10 @@
 #include "srclimit.h"
 #include "dh.h"
 
+#ifdef LINK_LIBPROXYPROTO
+#include "libproxyproto/libproxyproto.h"
+#endif
+
 /* Re-exec fds */
 #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
 #define REEXEC_STARTUP_PIPE_FD		(STDERR_FILENO + 2)
@@ -1542,6 +1546,10 @@ main(int ac, char **av)
 	int keytype;
 	Authctxt *authctxt;
 	struct connection_info *connection_info = NULL;
+
+#ifdef LINK_LIBPROXYPROTO
+	proxyproto_init();
+#endif
 
 #ifdef HAVE_SECUREWARE
 	(void)set_auth_parameters(ac, av);

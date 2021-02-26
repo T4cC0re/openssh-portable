@@ -1,0 +1,21 @@
+.PHONY: sshd
+sshd: Makefile
+	$(MAKE) -w $@
+
+libproxyproto/libproxyproto.a:
+	$(MAKE) -w -C libproxyproto libproxyproto.a
+
+Makefile: configure libproxyproto/libproxyproto.a
+	./configure --with-pam --with-kerberos5 --with-selinux --with-security-key-builtin '--with-ldflags=libproxyproto/libproxyproto.a' '--with-cflags=-DLINK_LIBPROXYPROTO=1'
+
+configure:
+	autoreconf
+
+clean:
+	-$(MAKE) -w clean
+	-$(MAKE) -w -C libproxyproto clean
+	-$(RM) -f compile_commands.json Makefile
+
+.PHONY: compile_commands.json
+compile_commands.json:
+	$(MAKE) -f Makefile.custom -d sshd 2>/dev/null | compiledb --full-path -f -o compile_commands.json

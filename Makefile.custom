@@ -19,3 +19,8 @@ clean:
 .PHONY: compile_commands.json
 compile_commands.json:
 	$(MAKE) -f Makefile.custom -d sshd 2>/dev/null | compiledb --full-path -f -o compile_commands.json
+
+rebase: clean
+	git remote add openssh https://github.com/openssh/openssh-portable.git || git remote set-url openssh https://github.com/openssh/openssh-portable.git
+	git fetch -u openssh master:openssh
+	git rebase openssh master

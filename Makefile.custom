@@ -1,9 +1,15 @@
-.PHONY: sshd
-sshd: Makefile
-	$(MAKE) -w $@
+.PHONY: sshd all tests openssh_tests clean rebase libproxyproto
+sshd all &:: Makefile
+	$(MAKE) -f Makefile -w $@
+
+libproxyproto:
+	$(MAKE) -w -C libproxyproto all
 
 libproxyproto/libproxyproto.a:
 	$(MAKE) -w -C libproxyproto libproxyproto.a
+
+libproxyproto/libproxyproto_connect.so:
+	$(MAKE) -w -C libproxyproto libproxyproto_connect.so
 
 Makefile: configure libproxyproto/libproxyproto.a
 	./configure --with-pam --with-kerberos5 --with-selinux --with-security-key-builtin '--with-ldflags=libproxyproto/libproxyproto.a' '--with-cflags=-DLINK_LIBPROXYPROTO=1'
@@ -12,15 +18,21 @@ configure:
 	autoreconf
 
 clean:
-	-$(MAKE) -w clean
-	-$(MAKE) -w -C libproxyproto clean
-	-$(RM) -f compile_commands.json Makefile
+	-$(MAKE) -f Makefile -w clean
+	-$(MAKE) -f Makefile -w -C libproxyproto clean
+	-rm -f compile_commands.json Makefile configure
 
 .PHONY: compile_commands.json
 compile_commands.json:
-	$(MAKE) -f Makefile.custom -d sshd 2>/dev/null | compiledb --full-path -f -o compile_commands.json
+	$(MAKE) -f Makefile.custom -w -d all libproxyproto 2>/dev/null | compiledb --full-path -f -o compile_commands.json
 
 rebase: clean
 	git remote add openssh https://github.com/openssh/openssh-portable.git || git remote set-url openssh https://github.com/openssh/openssh-portable.git
 	git fetch -u openssh master:openssh
 	git rebase openssh master
+
+tests: libproxyproto/libproxyproto_connect.so regress/ssh_config regress/sshd_config
+	LIBPROXYPROTO_DEBUG=1 ./custom_tests.sh
+
+openssh_tests regress/ssh_config regress/sshd_config &:: Makefile
+	TEST_SSH_UNSAFE_PERMISSIONS=1 LIBPROXYPROTO_DEBUG=1 $(MAKE) -f Makefile -w tests
